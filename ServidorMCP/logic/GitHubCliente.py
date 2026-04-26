@@ -1,6 +1,8 @@
 from typing import Literal
 import httpx
+from ServidorMCP.models.GitHubModels.ArchivoArbol import ArchivoArbol
 from ServidorMCP.models.GitHubModels.Commit import Commit
+from ServidorMCP.models.GitHubModels.EstructuraProyecto import EstructuraProyecto
 from ServidorMCP.models.GitHubModels.PullRequest import PullRequest
 
 
@@ -60,6 +62,69 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    async def get_estructura_proyecto(
+        self,
+        owner: str,
+        repo: str,
+        ref: str = "HEAD",
+    ) -> EstructuraProyecto:
+        """
+        Extrae la estructura de archivos y directorios del proyecto
+        en un commit específico.
+
+        Args:
+            owner: Propietario del repositorio.
+            repo: Nombre del repositorio.
+            ref: SHA del commit, nombre de rama o tag. Por defecto 'HEAD'.
+
+        Returns:
+            EstructuraProyecto con metadatos del commit y árbol completo de entradas.
+        """
+        async with httpx.AsyncClient(timeout=30) as client:
+            # 1. Obtener el commit para extraer el SHA del árbol y metadatos
+            r_commit = await client.get(
+                f"{self.BASE_URL}/repos/{owner}/{repo}/commits/{ref}",
+                headers=self._headers,
+            )
+            r_commit.raise_for_status()
+            datos_commit = r_commit.json()
+
+            tree_sha = datos_commit["commit"]["tree"]["sha"]
+
+            # 2. Obtener el árbol completo de forma recursiva
+            r_tree = await client.get(
+                f"{self.BASE_URL}/repos/{owner}/{repo}/git/trees/{tree_sha}",
+                headers=self._headers,
+                params={"recursive": "1"},
+            )
+            r_tree.raise_for_status()
+            datos_tree = r_tree.json()
+
+        entradas = [
+            ArchivoArbol(
+                ruta=item["path"],
+                tipo=item["type"],
+                sha=item["sha"],
+                tamanio=item.get("size"),
+            )
+            for item in datos_tree.get("tree", [])
+        ]
+
+        archivos = sum(1 for e in entradas if e.tipo == "blob")
+        directorios = sum(1 for e in entradas if e.tipo == "tree")
+
+        commit_sha = datos_commit["sha"]
+        return EstructuraProyecto(
+            commit_sha=commit_sha,
+            commit_sha_corto=commit_sha[:7],
+            mensaje_commit=datos_commit["commit"]["message"].split("\n")[0],
+            autor=datos_commit["commit"]["author"]["name"],
+            fecha=datos_commit["commit"]["author"]["date"],
+            total_archivos=archivos,
+            total_directorios=directorios,
+            entradas=entradas,
+        )
+
     async def get_archivo_markdown(
         self,
         owner: str,
@@ -92,11 +157,19 @@ class GitHubClient:
         self,
         owner: str,
         repo: str,
-        rama: str = "main",
+        rama: str,
         cantidad: int = 30,
+        desde: str | None = None,
+        hasta: str | None = None,
     ) -> list[Commit]:
         url = f"{self.BASE_URL}/repos/{owner}/{repo}/commits"
-        params = {"sha": rama, "per_page": min(cantidad, 100)}
+        params: dict = {"per_page": min(cantidad, 100)}
+        if rama.strip():
+            params["sha"] = rama
+        if desde:
+            params["since"] = desde
+        if hasta:
+            params["until"] = hasta
 
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(url, headers=self._headers, params=params)
