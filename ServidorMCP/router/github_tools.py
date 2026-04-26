@@ -9,6 +9,95 @@ def _cliente():
 
 def register(mcp: FastMCP) -> None:
 
+    # ------------------------------------------------------------------ #
+    #  Prompts                                                             #
+    # ------------------------------------------------------------------ #
+
+    @mcp.prompt()
+    def analizar_pull_requests(
+        owner: str,
+        repo: str,
+        estado: str = "all",
+    ) -> str:
+        """
+        Genera un prompt para analizar los pull requests de un repositorio.
+        Guía al LLM a obtener los PRs y presentar un análisis estructurado.
+        """
+        return f"""Analiza los pull requests del repositorio `{owner}/{repo}`.
+
+Pasos:
+1. Usa `obtener_pull_requests` con owner="{owner}", repo="{repo}", estado="{estado}".
+2. Con los resultados, presenta:
+   - Resumen general: total de PRs, cuántos están abiertos / cerrados / mergeados.
+   - Top PRs por impacto: los que tienen más archivos cambiados, adiciones o eliminaciones.
+   - PRs potencialmente bloqueados: abiertos con fecha de creación antigua.
+   - Distribución por autor: agrupa y cuenta PRs por contribuidor.
+   - Línea de tiempo: ordena por fecha de creación y destaca períodos de mayor actividad.
+3. Usa fechas en formato legible (DD/MM/AAAA).
+4. Si hay PRs sin merge después de 7 días, márcalos como ⚠️ posible bloqueo."""
+
+    @mcp.prompt()
+    def analizar_historial_commits(
+        owner: str,
+        repo: str,
+        rama: str = "",
+        desde: str = "",
+        hasta: str = "",
+    ) -> str:
+        """
+        Genera un prompt para analizar el historial de commits de un repositorio.
+        """
+        rango = ""
+        if desde or hasta:
+            rango = f" entre {desde or '...'} y {hasta or '...'}"
+
+        return f"""Analiza el historial de commits del repositorio `{owner}/{repo}`{rango}.
+
+Pasos:
+1. Usa `obtener_commits` con:
+   - owner="{owner}", repo="{repo}"
+   - rama="{rama}" {"(rama principal si está vacío)" if not rama else ""}
+   {"- desde=\"" + desde + "\"" if desde else ""}
+   {"- hasta=\"" + hasta + "\"" if hasta else ""}
+2. Con los resultados, presenta:
+   - Total de commits en el período.
+   - Contribuidores: lista de autores con cantidad de commits de cada uno.
+   - Frecuencia: días con mayor actividad de commits.
+   - Mensajes relevantes: agrupa commits por temática (feat, fix, refactor, etc.)
+     si siguen Conventional Commits; si no, resume los más significativos.
+   - SHA corto de cada commit para referencia rápida.
+3. Ordena la presentación del más reciente al más antiguo."""
+
+    @mcp.prompt()
+    def inspeccionar_estructura(
+        owner: str,
+        repo: str,
+        ref: str = "HEAD",
+    ) -> str:
+        """
+        Genera un prompt para inspeccionar y explicar la estructura del proyecto
+        en un commit específico.
+        """
+        return f"""Inspecciona la estructura del repositorio `{owner}/{repo}` en `{ref}`.
+
+Pasos:
+1. Usa `obtener_estructura_proyecto` con owner="{owner}", repo="{repo}", ref="{ref}".
+2. Con los resultados, presenta:
+   - Metadatos del commit: SHA, autor, fecha y mensaje.
+   - Árbol de directorios: muestra la jerarquía de carpetas principales (máx. 2 niveles).
+   - Archivos raíz: lista los archivos en el nivel superior y su propósito probable.
+   - Estadísticas: total de archivos y directorios.
+   - Tecnologías detectadas: infiere el stack a partir de extensiones de archivo
+     (ej: .py → Python, .ts → TypeScript, Dockerfile → Docker).
+   - Puntos de entrada probables: busca main.py, index.ts, app.py, etc.
+3. Presenta el árbol usando sangría para reflejar la jerarquía."""
+
+    # ------------------------------------------------------------------ #
+    #  Tools                                                               #
+    # ------------------------------------------------------------------ #
+
+    
+    
     @mcp.tool()
     async def obtener_pull_requests(
         owner: str,

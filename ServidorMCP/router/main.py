@@ -11,7 +11,7 @@ from ServidorMCP.router.documentacion_tools import register as register_document
 
 load_dotenv()
 
-mcp = FastMCP("ania-github")
+mcp = FastMCP("MCP-ania")
 
 register_github(mcp)
 register_documentacion(mcp)

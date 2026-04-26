@@ -10,6 +10,67 @@ def _cliente():
 
 def register(mcp: FastMCP) -> None:
 
+    # ------------------------------------------------------------------ #
+    #  Prompts                                                             #
+    # ------------------------------------------------------------------ #
+
+    @mcp.prompt()
+    def consultar_documentacion(
+        termino: str,
+        fuente: str,
+    ) -> str:
+        """
+        Genera un prompt para buscar un término en la documentación y presentar
+        los fragmentos relevantes de forma clara.
+
+        Args:
+            termino: Concepto o término técnico a buscar.
+            fuente: Descripción de la fuente (ej: ruta local, URL de GitHub, directorio).
+        """
+        return f"""Busca información sobre "{termino}" en la documentación ({fuente}).
+
+Pasos:
+1. Usa `buscar_en_documentacion` con termino="{termino}" y la fuente correspondiente.
+2. Con los fragmentos encontrados:
+   - Presenta cada fragmento indicando su título de sección y nivel de encabezado.
+   - Cita textualmente las partes más relevantes.
+   - Si hay varios fragmentos relacionados, sintetiza la información en una respuesta
+     coherente en lugar de listarlos por separado.
+   - Si no se encuentra el término, sugiere términos alternativos relacionados.
+3. Al final, indica en qué secciones del documento aparece la información."""
+
+    @mcp.prompt()
+    def resumir_seccion(
+        termino: str,
+        fuente: str,
+        max_fragmentos: int = 3,
+    ) -> str:
+        """
+        Genera un prompt para obtener un resumen ejecutivo de las secciones
+        de la documentación relacionadas con un término.
+
+        Args:
+            termino: Concepto o término técnico a resumir.
+            fuente: Descripción de la fuente de documentación.
+            max_fragmentos: Cantidad máxima de fragmentos a considerar.
+        """
+        return f"""Resume las secciones de la documentación ({fuente}) relacionadas
+con "{termino}".
+
+Pasos:
+1. Usa `buscar_en_documentacion` con termino="{termino}", max_resultados={max_fragmentos}
+   y la fuente correspondiente.
+2. Con los fragmentos:
+   - Escribe un resumen ejecutivo de máximo 3 párrafos.
+   - Incluye los conceptos clave definidos en la documentación.
+   - Menciona ejemplos o casos de uso si la documentación los incluye.
+   - Usa el vocabulario exacto del documento para términos técnicos.
+3. Cierra con una lista de puntos clave (bullet points) para referencia rápida."""
+
+    # ------------------------------------------------------------------ #
+    #  Tools                                                               #
+    # ------------------------------------------------------------------ #
+
     @mcp.tool()
     async def buscar_en_documentacion(
         termino: str,
