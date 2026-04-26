@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
 class PullRequest(BaseModel):
     numero: int
     titulo: str

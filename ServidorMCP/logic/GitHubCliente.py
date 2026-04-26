@@ -60,6 +60,34 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    async def get_archivo_markdown(
+        self,
+        owner: str,
+        repo: str,
+        ruta: str,
+    ) -> tuple[str, str]:
+        """
+        Descarga el contenido de un archivo Markdown desde GitHub.
+
+        Returns:
+            Tupla (contenido: str, url: str).
+        """
+        import base64
+
+        url = f"{self.BASE_URL}/repos/{owner}/{repo}/contents/{ruta}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(url, headers=self._headers)
+            response.raise_for_status()
+            datos = response.json()
+
+        if datos.get("type") != "file":
+            raise ValueError(f"La ruta '{ruta}' no corresponde a un archivo.")
+        if not ruta.lower().endswith((".md", ".markdown")):
+            raise ValueError(f"El archivo '{ruta}' no es Markdown.")
+
+        contenido = base64.b64decode(datos["content"]).decode("utf-8")
+        return contenido, datos["html_url"]
+
     async def get_commits(
         self,
         owner: str,
