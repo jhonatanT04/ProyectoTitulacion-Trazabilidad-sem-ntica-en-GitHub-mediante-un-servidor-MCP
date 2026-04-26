@@ -1,3 +1,4 @@
-from ServidorMCP.router.main import mcp
+from ServidorMCP.router.github_tools import register as register_github
+from ServidorMCP.router.documentacion_tools import register as register_documentacion
 
-__all__ = ["mcp"]
+__all__ = ["register_github", "register_documentacion"]
