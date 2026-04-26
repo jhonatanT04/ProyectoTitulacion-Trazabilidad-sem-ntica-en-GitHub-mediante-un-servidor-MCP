@@ -1,0 +1,14 @@
+{
+	"servers": {
+		"MCP-GitHub-V1.0": {
+			"type": "stdio",
+			"command": "uv",
+			"args": [
+				"run",
+				"python",
+				"ServidorMCP/router/main.py"
+			]
+		}
+	},
+	"inputs": []
+}
