@@ -1,7 +1,9 @@
 from typing import Literal
 import httpx
 from ServidorMCP.models.GitHubModels.ArchivoArbol import ArchivoArbol
+from ServidorMCP.models.GitHubModels.ArchivoDiff import ArchivoDiff
 from ServidorMCP.models.GitHubModels.Commit import Commit
+from ServidorMCP.models.GitHubModels.DiferenciaCommits import DiferenciaCommits
 from ServidorMCP.models.GitHubModels.EstructuraProyecto import EstructuraProyecto
 from ServidorMCP.models.GitHubModels.PullRequest import PullRequest
 
@@ -152,6 +154,75 @@ class GitHubClient:
 
         contenido = base64.b64decode(datos["content"]).decode("utf-8")
         return contenido, datos["html_url"]
+
+    async def get_diferencia_commits(
+        self,
+        owner: str,
+        repo: str,
+        base: str,
+        head: str,
+        incluir_patch: bool = True,
+    ) -> DiferenciaCommits:
+        """
+        Compara dos commits (o ramas/tags) y devuelve los archivos cambiados
+        junto con el diff unificado de cada uno.
+
+        Args:
+            owner: Propietario del repositorio.
+            repo: Nombre del repositorio.
+            base: SHA, rama o tag del commit base (más antiguo).
+            head: SHA, rama o tag del commit destino (más reciente).
+            incluir_patch: Si True incluye el patch (diff) de cada archivo.
+
+        Returns:
+            DiferenciaCommits con los commits intermedios, estadísticas globales
+            y la lista de archivos modificados con su diff.
+        """
+        url = f"{self.BASE_URL}/repos/{owner}/{repo}/compare/{base}...{head}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(url, headers=self._headers)
+            response.raise_for_status()
+            datos = response.json()
+
+        commits_intermedios = [
+            Commit(
+                sha=c["sha"],
+                sha_corto=c["sha"][:7],
+                mensaje=c["commit"]["message"].split("\n")[0],
+                autor=c["commit"]["author"]["name"],
+                email_autor=c["commit"]["author"]["email"],
+                fecha=c["commit"]["author"]["date"],
+                url=c["html_url"],
+            )
+            for c in datos.get("commits", [])
+        ]
+
+        archivos = [
+            ArchivoDiff(
+                ruta=f["filename"],
+                estado=f["status"],
+                adiciones=f["additions"],
+                eliminaciones=f["deletions"],
+                cambios=f["changes"],
+                patch=f.get("patch") if incluir_patch else None,
+            )
+            for f in datos.get("files", [])
+        ]
+
+        base_commit = datos["base_commit"]["sha"]
+        head_commit = datos["merge_base_commit"]["sha"] if "merge_base_commit" in datos else datos["commits"][-1]["sha"] if datos.get("commits") else head
+
+        return DiferenciaCommits(
+            base_sha=base_commit,
+            base_sha_corto=base_commit[:7],
+            head_sha=datos["commits"][-1]["sha"] if datos.get("commits") else head,
+            head_sha_corto=(datos["commits"][-1]["sha"] if datos.get("commits") else head)[:7],
+            commits_intermedios=commits_intermedios,
+            total_commits=datos.get("total_commits", len(commits_intermedios)),
+            adiciones_total=sum(f.adiciones for f in archivos),
+            eliminaciones_total=sum(f.eliminaciones for f in archivos),
+            archivos_cambiados=archivos,
+        )
 
     async def get_commits(
         self,
