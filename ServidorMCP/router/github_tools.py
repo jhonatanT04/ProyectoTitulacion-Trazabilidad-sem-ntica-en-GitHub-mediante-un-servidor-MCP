@@ -147,6 +147,31 @@ Pasos:
     
     
     @mcp.tool()
+    async def obtener_archivo(
+        owner: str,
+        repo: str,
+        ruta: str,
+        ref: str = "HEAD",
+    ) -> dict:
+        """
+        Descarga el contenido de cualquier archivo de texto de un repositorio
+        de GitHub (código fuente, configuración, documentación, etc.).
+
+        Args:
+            owner: Propietario del repositorio (usuario u organización).
+            repo: Nombre del repositorio.
+            ruta: Ruta al archivo dentro del repositorio (ej: 'src/main.py',
+                  'docs/guia.md', 'requirements.txt').
+            ref: SHA, rama o tag desde donde leer el archivo.
+                 Por defecto 'HEAD' (último commit de la rama principal).
+
+        Returns:
+            Dict con: ruta, sha, tamanio en bytes, html_url y contenido del archivo.
+        """
+        client = _cliente()
+        return await client.get_archivo(owner, repo, ruta, ref)
+
+    @mcp.tool()
     async def obtener_diferencia_commits(
         owner: str,
         repo: str,

@@ -127,6 +127,50 @@ class GitHubClient:
             entradas=entradas,
         )
 
+    async def get_archivo(
+        self,
+        owner: str,
+        repo: str,
+        ruta: str,
+        ref: str = "HEAD",
+    ) -> dict:
+        """
+        Descarga el contenido de cualquier archivo de texto desde GitHub.
+
+        Returns:
+            Dict con: contenido (str), ruta, sha, tamanio, html_url, encoding.
+        """
+        import base64
+
+        url = f"{self.BASE_URL}/repos/{owner}/{repo}/contents/{ruta}"
+        params = {} if ref == "HEAD" else {"ref": ref}
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(url, headers=self._headers, params=params)
+            response.raise_for_status()
+            datos = response.json()
+
+        if datos.get("type") != "file":
+            raise ValueError(f"La ruta '{ruta}' no corresponde a un archivo.")
+
+        encoding = datos.get("encoding", "base64")
+        if encoding == "base64":
+            try:
+                contenido = base64.b64decode(datos["content"]).decode("utf-8")
+            except UnicodeDecodeError:
+                raise ValueError(
+                    f"El archivo '{ruta}' es binario y no puede representarse como texto."
+                )
+        else:
+            contenido = datos.get("content", "")
+
+        return {
+            "ruta": datos["path"],
+            "sha": datos["sha"],
+            "tamanio": datos["size"],
+            "html_url": datos["html_url"],
+            "contenido": contenido,
+        }
+
     async def get_archivo_markdown(
         self,
         owner: str,
