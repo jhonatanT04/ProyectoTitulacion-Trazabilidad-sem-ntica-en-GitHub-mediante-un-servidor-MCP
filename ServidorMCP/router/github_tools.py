@@ -1,6 +1,9 @@
 from mcp.server.fastmcp import FastMCP
 
-from ServidorMCP.setting.conf import get_github_client
+from ServidorMCP.logic.MarkdownProcessor import MarkdownProcessor
+from ServidorMCP.logic.OpenAICliente import OpenAICliente
+from ServidorMCP.models.GitHubModels.ExplicacionCommit import ExplicacionCommit
+from ServidorMCP.setting.conf import get_github_client, get_openai_client
 
 
 def _cliente():
@@ -117,6 +120,51 @@ Pasos:
    - Archivos con mayor impacto (más líneas cambiadas)."""
 
     @mcp.prompt()
+    def analizar_commit_con_docs(
+        owner: str,
+        repo: str,
+        sha: str,
+        fuente_docs: str = "",
+    ) -> str:
+        """
+        Genera un prompt para explicar un commit correlacionando su diff con
+        documentación técnica relevante usando OpenAI.
+
+        Args:
+            owner: Propietario del repositorio.
+            repo: Nombre del repositorio.
+            sha: SHA del commit a explicar.
+            fuente_docs: Descripción de la fuente de documentación (ruta local,
+                         directorio, URL o repo de GitHub).
+        """
+        nota_docs = (
+            f"La documentación se encuentra en: {fuente_docs}"
+            if fuente_docs
+            else "No se especificó fuente de documentación (se explicará solo con el diff)."
+        )
+        return f"""Explica el commit `{sha[:7]}` del repositorio `{owner}/{repo}` \
+correlacionando su diff con la documentación técnica relevante.
+
+{nota_docs}
+
+Pasos:
+1. Usa `explicar_commit` con:
+   - owner="{owner}", repo="{repo}", sha="{sha}"
+   - Añade el parámetro de fuente de documentación según corresponda:
+     · ruta_doc_local    → archivo .md local
+     · directorio_doc_local → carpeta con archivos .md
+     · url_doc           → URL de documentación online
+     · owner_doc + repo_doc + ruta_doc_github → archivo .md en GitHub
+
+2. Presenta la explicación generada respetando sus secciones:
+   - **Resumen**: qué hace el commit en una oración.
+   - **Cambios principales**: archivos y funciones modificadas.
+   - **Contexto de la documentación**: cómo los fragmentos de docs justifican los cambios.
+   - **Impacto técnico**: consecuencias en el sistema.
+
+3. Al final indica cuántos fragmentos de documentación fueron utilizados y el modelo empleado."""
+
+    @mcp.prompt()
     def inspeccionar_estructura(
         owner: str,
         repo: str,
@@ -146,6 +194,94 @@ Pasos:
 
     
     
+    @mcp.tool()
+    async def explicar_commit(
+        owner: str,
+        repo: str,
+        sha: str,
+        ruta_doc_local: str | None = None,
+        directorio_doc_local: str | None = None,
+        url_doc: str | None = None,
+        owner_doc: str | None = None,
+        repo_doc: str | None = None,
+        ruta_doc_github: str | None = None,
+        modelo: str = "gpt-5.4-mini",
+    ) -> dict:
+        """
+        Explica un commit en lenguaje natural correlacionando su diff con
+        documentación técnica relevante mediante la API de OpenAI.
+
+        Extrae automáticamente los términos clave del diff para buscar los
+        fragmentos de documentación más relevantes antes de llamar al modelo.
+
+        Args:
+            owner: Propietario del repositorio (usuario u organización).
+            repo: Nombre del repositorio.
+            sha: SHA completo o corto del commit a explicar.
+            ruta_doc_local: Ruta absoluta a un archivo .md local (fuente 1).
+            directorio_doc_local: Ruta absoluta a un directorio con archivos .md (fuente 2).
+            url_doc: URL de una página de documentación online (fuente 3).
+            owner_doc: Propietario del repo de documentación en GitHub (fuente 4).
+            repo_doc: Nombre del repo de documentación en GitHub (fuente 4).
+            ruta_doc_github: Ruta al archivo .md en el repo de documentación (fuente 4).
+            modelo: Modelo de OpenAI a usar. Por defecto 'gpt-4o'.
+
+        Returns:
+            ExplicacionCommit con: sha, sha_corto, mensaje_commit, explicacion,
+            fragmentos_usados y modelo empleado.
+        """
+        gh = _cliente()
+
+        # 1. Obtener SHA del padre y el diff del commit
+        sha_padre = await gh.get_sha_padre(owner, repo, sha)
+        diferencia = await gh.get_diferencia_commits(owner, repo, sha_padre, sha)
+
+        # 2. Mensaje del commit
+        mensaje = (
+            diferencia.commits_intermedios[0].mensaje
+            if diferencia.commits_intermedios
+            else sha[:7]
+        )
+
+        # 3. Buscar documentación relevante si se proporcionó una fuente
+        fragmentos = []
+        tiene_fuente = any([
+            ruta_doc_local,
+            directorio_doc_local,
+            url_doc,
+            (owner_doc and repo_doc and ruta_doc_github),
+        ])
+
+        if tiene_fuente:
+            terminos = OpenAICliente.extraer_terminos(diferencia)
+            termino_busqueda = " ".join(terminos[:3]) if terminos else mensaje[:60]
+
+            processor = MarkdownProcessor()
+            if url_doc:
+                resultado = await processor.buscar_en_url(termino_busqueda, url_doc, 5)
+            elif owner_doc and repo_doc and ruta_doc_github:
+                contenido, url = await gh.get_archivo_markdown(owner_doc, repo_doc, ruta_doc_github)
+                resultado = processor.buscar_en_contenido(termino_busqueda, contenido, url, 5)
+            elif directorio_doc_local:
+                resultado = processor.buscar_en_directorio(termino_busqueda, directorio_doc_local, 5)
+            else:
+                resultado = processor.buscar(termino_busqueda, ruta_doc_local, 5)
+
+            fragmentos = resultado.fragmentos
+
+        # 4. Llamar a OpenAI
+        ia = OpenAICliente(get_openai_client())
+        explicacion = await ia.explicar_commit(diferencia, mensaje, fragmentos, modelo)
+
+        return ExplicacionCommit(
+            sha=sha,
+            sha_corto=sha[:7],
+            mensaje_commit=mensaje,
+            explicacion=explicacion,
+            fragmentos_usados=len(fragmentos),
+            modelo=modelo,
+        ).model_dump()
+
     @mcp.tool()
     async def obtener_archivo(
         owner: str,

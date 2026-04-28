@@ -268,6 +268,36 @@ class GitHubClient:
             archivos_cambiados=archivos,
         )
 
+    async def get_sha_padre(self, owner: str, repo: str, sha: str) -> str:
+        """
+        Retorna el SHA del commit padre del commit dado.
+
+        Args:
+            owner: Propietario del repositorio.
+            repo: Nombre del repositorio.
+            sha: SHA del commit hijo.
+
+        Returns:
+            SHA completo del commit padre.
+
+        Raises:
+            ValueError: Si el commit no tiene padre (es el commit inicial).
+        """
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(
+                f"{self.BASE_URL}/repos/{owner}/{repo}/commits/{sha}",
+                headers=self._headers,
+            )
+            r.raise_for_status()
+            datos = r.json()
+
+        padres = datos.get("parents", [])
+        if not padres:
+            raise ValueError(
+                f"El commit {sha[:7]} no tiene padre (es el commit inicial del repositorio)."
+            )
+        return padres[0]["sha"]
+
     async def get_commits(
         self,
         owner: str,
