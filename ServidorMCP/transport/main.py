@@ -8,8 +8,8 @@ from mcp.server.fastmcp import FastMCP
 
 
 
-from ServidorMCP.router.github_tools import register as register_github
-from ServidorMCP.router.documentacion_tools import register as register_documentacion
+from ServidorMCP.transport.github_tools import register as register_github
+from ServidorMCP.transport.documentacion_tools import register as register_documentacion
 
 load_dotenv()
 
