@@ -1,11 +1,8 @@
-import logging
 import re
 import unicodedata
 from glob import glob
 from html.parser import HTMLParser
 from pathlib import Path
-
-log = logging.getLogger(__name__)
 
 from ServidorMCP.models.SemanticText.Fragmento import Fragmento
 from ServidorMCP.models.SemanticText.IndiceDocumento import IndiceDocumento
@@ -75,7 +72,6 @@ class MarkdownProcessor:
             (m.start(), m.end(), m.group(1).strip() or "text", m.group(2).strip())
             for m in _RE_CODE_BLOCK.finditer(contenido)
         ]
-        log.debug("Bloques de código detectados: %d", len(bloques))
         return bloques
 
     def _en_bloque_codigo(self, pos: int, bloques: list) -> bool:
@@ -88,7 +84,6 @@ class MarkdownProcessor:
         - Un fragmento independiente por cada bloque de código
         La jerarquía de encabezados se preserva como breadcrumb.
         """
-        log.info("Fragmentando fuente: %s (%d caracteres)", fuente, len(contenido))
         bloques = self._bloques_codigo(contenido)
 
         # Solo headers fuera de bloques de código
@@ -96,8 +91,6 @@ class MarkdownProcessor:
             m for m in _RE_HEADER.finditer(contenido)
             if not self._en_bloque_codigo(m.start(), bloques)
         ]
-        log.debug("Encabezados detectados fuera de código: %d", len(headers))
-
         fragmentos: list[Fragmento] = []
         # Pila de (nivel, titulo) para construir la jerarquía
         pila: list[tuple[int, str]] = []
@@ -117,7 +110,6 @@ class MarkdownProcessor:
         # Eliminar bloques de código del intro
         intro_limpio = self._quitar_codigo(intro, bloques, 0)
         if intro_limpio:
-            log.debug("Intro detectada (%d caracteres)", len(intro_limpio))
             fragmentos.append(Fragmento(
                 id=f"{fuente}#intro",
                 titulo="Introducción",
@@ -146,11 +138,6 @@ class MarkdownProcessor:
                 (s, e, lang, code) for s, e, lang, code in bloques
                 if inicio_cuerpo <= s < fin_cuerpo
             ]
-            log.debug(
-                "[%s] H%d '%s' | jerarquía=%s | bloques_código=%d",
-                fuente, nivel, titulo, jerarquia, len(bloques_seccion),
-            )
-
             # Texto de la sección sin los bloques de código
             cuerpo_texto = self._quitar_codigo(cuerpo_raw, bloques_seccion, inicio_cuerpo)
 
@@ -172,7 +159,6 @@ class MarkdownProcessor:
             for j, (_, _, lang, code) in enumerate(bloques_seccion):
                 if not code.strip():
                     continue
-                log.debug("  Bloque código %d: lang=%s (%d líneas)", j, lang, code.count('\n') + 1)
                 fragmentos.append(Fragmento(
                     id=f"{fuente}#{i}_code{j}",
                     titulo=f"{titulo} — ejemplo {'(' + lang + ')' if lang and lang != 'text' else '(código)'}",
@@ -186,7 +172,6 @@ class MarkdownProcessor:
                 ))
                 posicion += 1
 
-        log.info("Fragmentación completa: %d fragmentos generados", len(fragmentos))
         return fragmentos
 
     def _quitar_codigo(
@@ -252,13 +237,9 @@ class MarkdownProcessor:
         termino: str,
         max_resultados: int,
     ) -> list[Fragmento]:
-        log.info("Puntuando %d fragmentos para término '%s'", len(fragmentos), termino)
         puntuados = [(self._puntuar(f, termino), f) for f in fragmentos]
         puntuados = [(p, f) for p, f in puntuados if p > 0]
         puntuados.sort(key=lambda x: x[0], reverse=True)
-        for puntuacion, f in puntuados[:max_resultados]:
-            log.debug("  [%d pts] %s (tipo=%s)", puntuacion, f.titulo, f.tipo)
-        log.info("Fragmentos relevantes encontrados: %d (máx solicitado: %d)", len(puntuados), max_resultados)
         return [f for _, f in puntuados[:max_resultados]]
 
     # ----------------------------------------------------------------------- #
@@ -266,16 +247,12 @@ class MarkdownProcessor:
     # ----------------------------------------------------------------------- #
 
     def indexar_archivo(self, ruta_archivo: str) -> IndiceDocumento:
-        log.info("Indexando archivo: %s", ruta_archivo)
         ruta = Path(ruta_archivo)
         if not ruta.exists():
-            log.error("Archivo no encontrado: %s", ruta_archivo)
             raise FileNotFoundError(f"Archivo no encontrado: {ruta_archivo}")
         if ruta.suffix.lower() not in ('.md', '.markdown'):
-            log.error("El archivo no es Markdown: %s", ruta_archivo)
             raise ValueError(f"El archivo no es Markdown: {ruta_archivo}")
         contenido = ruta.read_text(encoding='utf-8')
-        log.debug("Archivo leído: %d caracteres", len(contenido))
         fragmentos = self.fragmentar(contenido, ruta_archivo)
         return IndiceDocumento(
             ruta_archivo=ruta_archivo,
@@ -285,41 +262,71 @@ class MarkdownProcessor:
 
     def buscar(self, termino: str, ruta_archivo: str, max_resultados: int = 5) -> ResultadoBusqueda:
         """Busca en un archivo Markdown local."""
-        log.info("Búsqueda en archivo | término='%s' | archivo=%s", termino, ruta_archivo)
         indice = self.indexar_archivo(ruta_archivo)
         relevantes = self._top_fragmentos(indice.fragmentos, termino, max_resultados)
         return ResultadoBusqueda(termino=termino, total=len(relevantes), fragmentos=relevantes)
 
     def buscar_en_directorio(self, termino: str, directorio: str, max_resultados: int = 5) -> ResultadoBusqueda:
         """Busca recursivamente en todos los archivos Markdown de un directorio."""
-        log.info("Búsqueda en directorio | término='%s' | directorio=%s", termino, directorio)
         archivos = (
             glob(f"{directorio}/**/*.md", recursive=True)
             + glob(f"{directorio}/**/*.markdown", recursive=True)
         )
-        log.debug("Archivos Markdown encontrados: %d", len(archivos))
         if not archivos:
-            log.warning("No se encontraron archivos Markdown en: %s", directorio)
             return ResultadoBusqueda(termino=termino, total=0, fragmentos=[])
 
         todos: list[Fragmento] = []
         for archivo in archivos:
             try:
                 todos.extend(self.indexar_archivo(archivo).fragmentos)
-            except Exception as exc:
-                log.warning("Error al indexar '%s': %s", archivo, exc)
+            except Exception:
                 continue
 
-        log.debug("Total de fragmentos acumulados de todos los archivos: %d", len(todos))
         relevantes = self._top_fragmentos(todos, termino, max_resultados)
         return ResultadoBusqueda(termino=termino, total=len(relevantes), fragmentos=relevantes)
 
     def buscar_en_contenido(self, termino: str, contenido: str, fuente: str, max_resultados: int = 5) -> ResultadoBusqueda:
         """Busca en contenido Markdown ya cargado en memoria."""
-        log.info("Búsqueda en contenido en memoria | término='%s' | fuente=%s", termino, fuente)
         fragmentos = self.fragmentar(contenido, fuente)
         relevantes = self._top_fragmentos(fragmentos, termino, max_resultados)
         return ResultadoBusqueda(termino=termino, total=len(relevantes), fragmentos=relevantes)
+
+    def fragmentar_directorio(self, directorio: str) -> list[Fragmento]:
+        """Retorna todos los fragmentos de todos los archivos Markdown de un directorio."""
+        archivos = (
+            glob(f"{directorio}/**/*.md", recursive=True)
+            + glob(f"{directorio}/**/*.markdown", recursive=True)
+        )
+        todos: list[Fragmento] = []
+        for archivo in archivos:
+            try:
+                todos.extend(self.indexar_archivo(archivo).fragmentos)
+            except Exception:
+                pass
+        return todos
+
+    async def fragmentar_desde_url(self, url: str) -> list[Fragmento]:
+        """Descarga documentación desde una URL y retorna todos los fragmentos sin filtrar."""
+        import httpx
+
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(url, headers={"User-Agent": "ANIA-MCP/1.0"})
+            response.raise_for_status()
+            contenido_raw = response.text
+
+        es_markdown = (
+            url.endswith(('.md', '.markdown'))
+            or 'raw.githubusercontent.com' in url
+            or response.headers.get('content-type', '').startswith('text/plain')
+        )
+
+        if es_markdown:
+            return self.fragmentar(contenido_raw, url)
+
+        extractor = _HTMLTextExtractor()
+        extractor.feed(contenido_raw)
+        texto = extractor.texto()
+        return self.fragmentar(texto, url)
 
     async def buscar_en_url(self, termino: str, url: str, max_resultados: int = 5) -> ResultadoBusqueda:
         """
@@ -329,14 +336,10 @@ class MarkdownProcessor:
         """
         import httpx
 
-        log.info("Búsqueda en URL | término='%s' | url=%s", termino, url)
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             response = await client.get(url, headers={"User-Agent": "ANIA-MCP/1.0"})
             response.raise_for_status()
             contenido_raw = response.text
-
-        log.debug("Respuesta recibida: %d caracteres | content-type=%s",
-                  len(contenido_raw), response.headers.get('content-type', ''))
 
         es_markdown = (
             url.endswith(('.md', '.markdown'))
@@ -345,12 +348,9 @@ class MarkdownProcessor:
         )
 
         if es_markdown:
-            log.debug("Fuente detectada como Markdown crudo")
             return self.buscar_en_contenido(termino, contenido_raw, url, max_resultados)
 
-        log.debug("Fuente detectada como HTML — extrayendo texto")
         extractor = _HTMLTextExtractor()
         extractor.feed(contenido_raw)
         texto = extractor.texto()
-        log.debug("Texto extraído del HTML: %d caracteres", len(texto))
         return self.buscar_en_contenido(termino, texto, url, max_resultados)

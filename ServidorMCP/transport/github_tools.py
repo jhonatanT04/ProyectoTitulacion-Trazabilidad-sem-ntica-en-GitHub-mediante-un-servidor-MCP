@@ -3,8 +3,8 @@ from mcp.server.fastmcp import FastMCP
 from ServidorMCP.logic.MarkdownProcessor import MarkdownProcessor
 from ServidorMCP.logic.OpenAICliente import OpenAICliente
 from ServidorMCP.models.GitHubModels.ExplicacionCommit import ExplicacionCommit
-from ServidorMCP.setting.conf import get_github_client, get_openai_client
-
+from ServidorMCP.models.SemanticText.Fragmento import Fragmento
+from ServidorMCP.setting.conf import get_github_client, get_openai_client, get_openai_model
 
 def _cliente():
     return get_github_client()
@@ -119,50 +119,50 @@ Pasos:
    - ¿Hubo cambios en la documentación que reflejen los cambios de código?
    - Archivos con mayor impacto (más líneas cambiadas)."""
 
-    @mcp.prompt()
-    def analizar_commit_con_docs(
-        owner: str,
-        repo: str,
-        sha: str,
-        fuente_docs: str = "",
-    ) -> str:
-        """
-        Genera un prompt para explicar un commit correlacionando su diff con
-        documentación técnica relevante usando OpenAI.
+#     @mcp.prompt()
+#     def analizar_commit_con_docs(
+#         owner: str,
+#         repo: str,
+#         sha: str,
+#         fuente_docs: str = "",
+#     ) -> str:
+#         """
+#         Genera un prompt para explicar un commit correlacionando su diff con
+#         documentación técnica relevante usando OpenAI.
 
-        Args:
-            owner: Propietario del repositorio.
-            repo: Nombre del repositorio.
-            sha: SHA del commit a explicar.
-            fuente_docs: Descripción de la fuente de documentación (ruta local,
-                         directorio, URL o repo de GitHub).
-        """
-        nota_docs = (
-            f"La documentación se encuentra en: {fuente_docs}"
-            if fuente_docs
-            else "No se especificó fuente de documentación (se explicará solo con el diff)."
-        )
-        return f"""Explica el commit `{sha[:7]}` del repositorio `{owner}/{repo}` \
-correlacionando su diff con la documentación técnica relevante.
+#         Args:
+#             owner: Propietario del repositorio.
+#             repo: Nombre del repositorio.
+#             sha: SHA del commit a explicar.
+#             fuente_docs: Descripción de la fuente de documentación (ruta local,
+#                          directorio, URL o repo de GitHub).
+#         """
+#         nota_docs = (
+#             f"La documentación se encuentra en: {fuente_docs}"
+#             if fuente_docs
+#             else "No se especificó fuente de documentación (se explicará solo con el diff)."
+#         )
+#         return f"""Explica el commit `{sha[:7]}` del repositorio `{owner}/{repo}` \
+# correlacionando su diff con la documentación técnica relevante.
 
-{nota_docs}
+# {nota_docs}
 
-Pasos:
-1. Usa `explicar_commit` con:
-   - owner="{owner}", repo="{repo}", sha="{sha}"
-   - Añade el parámetro de fuente de documentación según corresponda:
-     · ruta_doc_local    → archivo .md local
-     · directorio_doc_local → carpeta con archivos .md
-     · url_doc           → URL de documentación online
-     · owner_doc + repo_doc + ruta_doc_github → archivo .md en GitHub
+# Pasos:
+# 1. Usa `explicar_commit` con:
+#    - owner="{owner}", repo="{repo}", sha="{sha}"
+#    - Añade el parámetro de fuente de documentación según corresponda:
+#      · ruta_doc_local    → archivo .md local
+#      · directorio_doc_local → carpeta con archivos .md
+#      · url_doc           → URL de documentación online
+#      · owner_doc + repo_doc + ruta_doc_github → archivo .md en GitHub
 
-2. Presenta la explicación generada respetando sus secciones:
-   - **Resumen**: qué hace el commit en una oración.
-   - **Cambios principales**: archivos y funciones modificadas.
-   - **Contexto de la documentación**: cómo los fragmentos de docs justifican los cambios.
-   - **Impacto técnico**: consecuencias en el sistema.
+# 2. Presenta la explicación generada respetando sus secciones:
+#    - **Resumen**: qué hace el commit en una oración.
+#    - **Cambios principales**: archivos y funciones modificadas.
+#    - **Contexto de la documentación**: cómo los fragmentos de docs justifican los cambios.
+#    - **Impacto técnico**: consecuencias en el sistema.
 
-3. Al final indica cuántos fragmentos de documentación fueron utilizados y el modelo empleado."""
+# 3. Al final indica cuántos fragmentos de documentación fueron utilizados y el modelo empleado."""
 
     @mcp.prompt()
     def inspeccionar_estructura(
@@ -194,93 +194,126 @@ Pasos:
 
     
     
-    @mcp.tool()
-    async def explicar_commit(
-        owner: str,
-        repo: str,
-        sha: str,
-        ruta_doc_local: str | None = None,
-        directorio_doc_local: str | None = None,
-        url_doc: str | None = None,
-        owner_doc: str | None = None,
-        repo_doc: str | None = None,
-        ruta_doc_github: str | None = None,
-        modelo: str = "gpt-5.4-mini",
-    ) -> dict:
-        """
-        Explica un commit en lenguaje natural correlacionando su diff con
-        documentación técnica relevante mediante la API de OpenAI.
+    # @mcp.tool()
+    # async def explicar_commit(
+    #     owner: str,
+    #     repo: str,
+    #     sha: str,
+    #     ruta_doc_local: str | None = None,
+    #     directorio_doc_local: str | None = None,
+    #     url_doc: str | None = None,
+    #     owner_doc: str | None = None,
+    #     repo_doc: str | None = None,
+    #     ruta_doc_github: str | None = None,
+    # ) -> dict:
+    #     """
+    #     Explica un commit en lenguaje natural correlacionando su diff con
+    #     documentación técnica relevante mediante la API de OpenAI.
 
-        Extrae automáticamente los términos clave del diff para buscar los
-        fragmentos de documentación más relevantes antes de llamar al modelo.
+    #     Implementa dos mejoras sobre la búsqueda básica:
+    #     - [B] Correlación temporal: si la fuente es un archivo en GitHub, busca
+    #       automáticamente la versión del documento vigente al momento del commit
+    #       (no la versión actual), evitando correlacionar con documentación futura.
+    #     - [A] Búsqueda semántica: usa embeddings (text-embedding-3-small) para
+    #       rankear los fragmentos por similitud semántica al diff, no por coincidencia
+    #       de palabras. Fallback automático a búsqueda léxica si falla la API.
 
-        Args:
-            owner: Propietario del repositorio (usuario u organización).
-            repo: Nombre del repositorio.
-            sha: SHA completo o corto del commit a explicar.
-            ruta_doc_local: Ruta absoluta a un archivo .md local (fuente 1).
-            directorio_doc_local: Ruta absoluta a un directorio con archivos .md (fuente 2).
-            url_doc: URL de una página de documentación online (fuente 3).
-            owner_doc: Propietario del repo de documentación en GitHub (fuente 4).
-            repo_doc: Nombre del repo de documentación en GitHub (fuente 4).
-            ruta_doc_github: Ruta al archivo .md en el repo de documentación (fuente 4).
-            modelo: Modelo de OpenAI a usar. Por defecto 'gpt-4o'.
+    #     Args:
+    #         owner: Propietario del repositorio (usuario u organización).
+    #         repo: Nombre del repositorio.
+    #         sha: SHA completo o corto del commit a explicar.
+    #         ruta_doc_local: Ruta absoluta a un archivo .md local (fuente 1).
+    #         directorio_doc_local: Ruta absoluta a un directorio con archivos .md (fuente 2).
+    #         url_doc: URL de una página de documentación online (fuente 3).
+    #         owner_doc: Propietario del repo de documentación en GitHub (fuente 4, aplica B).
+    #         repo_doc: Nombre del repo de documentación en GitHub (fuente 4, aplica B).
+    #         ruta_doc_github: Ruta al archivo .md en el repo de documentación (fuente 4, aplica B).
+    #         modelo: Modelo de OpenAI a usar. Si se omite, usa la variable OPENAI_MODEL.
 
-        Returns:
-            ExplicacionCommit con: sha, sha_corto, mensaje_commit, explicacion,
-            fragmentos_usados y modelo empleado.
-        """
-        gh = _cliente()
+    #     Returns:
+    #         ExplicacionCommit con: sha, sha_corto, mensaje_commit, explicacion,
+    #         fragmentos_usados, modelo, metodo_busqueda y version_doc_sha (SHA del
+    #         doc histórico usado, solo cuando aplica correlación temporal).
+    #     """
+    #     modelo = get_openai_model()
+    #     gh = _cliente()
+    #     ia = OpenAICliente(get_openai_client())
 
-        # 1. Obtener SHA del padre y el diff del commit
-        sha_padre = await gh.get_sha_padre(owner, repo, sha)
-        diferencia = await gh.get_diferencia_commits(owner, repo, sha_padre, sha)
+    #     # 1. Diff del commit
+    #     sha_padre = await gh.get_sha_padre(owner, repo, sha)
+    #     diferencia = await gh.get_diferencia_commits(owner, repo, sha_padre, sha)
 
-        # 2. Mensaje del commit
-        mensaje = (
-            diferencia.commits_intermedios[0].mensaje
-            if diferencia.commits_intermedios
-            else sha[:7]
-        )
+    #     primer_commit = diferencia.commits_intermedios[0] if diferencia.commits_intermedios else None
+    #     mensaje = primer_commit.mensaje if primer_commit else sha[:7]
+    #     fecha_commit = primer_commit.fecha if primer_commit else None
 
-        # 3. Buscar documentación relevante si se proporcionó una fuente
-        fragmentos = []
-        tiene_fuente = any([
-            ruta_doc_local,
-            directorio_doc_local,
-            url_doc,
-            (owner_doc and repo_doc and ruta_doc_github),
-        ])
+    #     # 2. Recolectar fragmentos de documentación
+    #     fragmentos: list[Fragmento] = []
+    #     version_doc_sha: str | None = None
+    #     metodo_busqueda = "ninguno"
 
-        if tiene_fuente:
-            terminos = OpenAICliente.extraer_terminos(diferencia)
-            termino_busqueda = " ".join(terminos[:3]) if terminos else mensaje[:60]
+    #     tiene_fuente = any([
+    #         ruta_doc_local,
+    #         directorio_doc_local,
+    #         url_doc,
+    #         (owner_doc and repo_doc and ruta_doc_github),
+    #     ])
 
-            processor = MarkdownProcessor()
-            if url_doc:
-                resultado = await processor.buscar_en_url(termino_busqueda, url_doc, 5)
-            elif owner_doc and repo_doc and ruta_doc_github:
-                contenido, url = await gh.get_archivo_markdown(owner_doc, repo_doc, ruta_doc_github)
-                resultado = processor.buscar_en_contenido(termino_busqueda, contenido, url, 5)
-            elif directorio_doc_local:
-                resultado = processor.buscar_en_directorio(termino_busqueda, directorio_doc_local, 5)
-            else:
-                resultado = processor.buscar(termino_busqueda, ruta_doc_local, 5)
+    #     if tiene_fuente:
+    #         terminos = OpenAICliente.extraer_terminos(diferencia)
+    #         termino_busqueda = " ".join(terminos[:3]) if terminos else mensaje[:60]
+    #         processor = MarkdownProcessor()
 
-            fragmentos = resultado.fragmentos
+    #         # Obtener TODOS los fragmentos según la fuente (sin filtrar aún)
+    #         todos_fragmentos: list[Fragmento] = []
 
-        # 4. Llamar a OpenAI
-        ia = OpenAICliente(get_openai_client())
-        explicacion = await ia.explicar_commit(diferencia, mensaje, fragmentos, modelo)
+    #         if url_doc:
+    #             todos_fragmentos = await processor.fragmentar_desde_url(url_doc)
 
-        return ExplicacionCommit(
-            sha=sha,
-            sha_corto=sha[:7],
-            mensaje_commit=mensaje,
-            explicacion=explicacion,
-            fragmentos_usados=len(fragmentos),
-            modelo=modelo,
-        ).model_dump()
+    #         elif owner_doc and repo_doc and ruta_doc_github:
+    #             # [B] Correlación temporal: buscar la versión del doc vigente al momento del commit
+    #             ref_doc = "HEAD"
+    #             if fecha_commit:
+    #                 sha_historico = await gh.get_sha_doc_en_fecha(
+    #                     owner_doc, repo_doc, ruta_doc_github, fecha_commit
+    #                 )
+    #                 if sha_historico:
+    #                     ref_doc = sha_historico
+    #                     version_doc_sha = sha_historico
+
+    #             contenido, url_fuente = await gh.get_archivo_markdown(
+    #                 owner_doc, repo_doc, ruta_doc_github, ref=ref_doc
+    #             )
+    #             todos_fragmentos = processor.fragmentar(contenido, url_fuente)
+
+    #         elif directorio_doc_local:
+    #             todos_fragmentos = processor.fragmentar_directorio(directorio_doc_local)
+
+    #         else:
+    #             todos_fragmentos = processor.indexar_archivo(ruta_doc_local).fragmentos
+
+    #         # [A] Búsqueda semántica con embeddings; fallback léxico si falla
+    #         if todos_fragmentos:
+    #             try:
+    #                 fragmentos = await ia.buscar_con_embeddings(todos_fragmentos, termino_busqueda, 5)
+    #                 metodo_busqueda = "embeddings"
+    #             except Exception as exc:
+    #                 fragmentos = processor._top_fragmentos(todos_fragmentos, termino_busqueda, 5)
+    #                 metodo_busqueda = "lexica"
+
+    #     # 3. Llamar a OpenAI para generar la explicación
+    #     explicacion = await ia.explicar_commit(diferencia, mensaje, fragmentos, modelo)
+
+    #     return ExplicacionCommit(
+    #         sha=sha,
+    #         sha_corto=sha[:7],
+    #         mensaje_commit=mensaje,
+    #         explicacion=explicacion,
+    #         fragmentos_usados=len(fragmentos),
+    #         modelo=modelo,
+    #         metodo_busqueda=metodo_busqueda,
+    #         version_doc_sha=version_doc_sha,
+    #     ).model_dump()
 
     @mcp.tool()
     async def obtener_archivo(

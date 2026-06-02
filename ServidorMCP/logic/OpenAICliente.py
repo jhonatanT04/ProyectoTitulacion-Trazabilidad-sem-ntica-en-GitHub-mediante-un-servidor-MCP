@@ -5,6 +5,8 @@ import openai
 from ServidorMCP.models.GitHubModels.DiferenciaCommits import DiferenciaCommits
 from ServidorMCP.models.SemanticText.Fragmento import Fragmento
 
+EMBEDDING_MODEL = "text-embedding-3-small"
+
 MAX_DIFF_CHARS = 6_000
 
 SYSTEM_PROMPT = """Eres un analista senior de software especializado en trazabilidad semántica.
@@ -92,12 +94,65 @@ class OpenAICliente:
 
         return "\n\n".join(partes)
 
+    async def buscar_con_embeddings(
+        self,
+        fragmentos: list[Fragmento],
+        termino: str,
+        max_resultados: int = 5,
+    ) -> list[Fragmento]:
+        """
+        Clasifica fragmentos por similitud semántica al término usando embeddings.
+
+        Genera embeddings para todos los fragmentos y la query en una sola
+        llamada a la API (batch). Usa cosine similarity para rankear.
+
+        Args:
+            fragmentos: Lista completa de fragmentos a clasificar.
+            termino: Término o frase de búsqueda (normalmente extraído del diff).
+            max_resultados: Número máximo de fragmentos a retornar.
+
+        Returns:
+            Lista de fragmentos ordenados por similitud semántica descendente.
+        """
+        if not fragmentos:
+            return []
+
+        # Texto representativo de cada fragmento: título + primeros 400 chars de contenido
+        textos = [
+            f"{f.titulo}. {f.contenido}"[:500]
+            for f in fragmentos
+        ]
+
+        response = await self._client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=textos + [termino],
+        )
+
+        data = response.data
+        query_emb: list[float] = data[-1].embedding
+        frag_embs: list[list[float]] = [item.embedding for item in data[:-1]]
+
+        def _cosine(a: list[float], b: list[float]) -> float:
+            dot = sum(x * y for x, y in zip(a, b))
+            na = sum(x ** 2 for x in a) ** 0.5
+            nb = sum(x ** 2 for x in b) ** 0.5
+            return dot / (na * nb) if na and nb else 0.0
+
+        scores = sorted(
+            zip(frag_embs, fragmentos),
+            key=lambda t: _cosine(query_emb, t[0]),
+            reverse=True,
+        )
+
+        resultado = [f for _, f in scores[:max_resultados]]
+        return resultado
+
     async def explicar_commit(
         self,
         diferencia: DiferenciaCommits,
         mensaje_commit: str,
         fragmentos: list[Fragmento],
-        modelo: str = "GPT-5.4 mini",
+        modelo: str = "gpt-4o-mini",
     ) -> str:
         """
         Construye el prompt de correlación semántica y llama a la API de OpenAI
