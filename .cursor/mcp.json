@@ -3,7 +3,7 @@
     "tesis-mcp": {
       "command": "uv",
       "args": ["run", "tesis-mcp"],
-      "cwd": "/home/jhonatan/VisualCodeStudio/TESIS"
+      "cwd": "/home/jhonatan/VisualCodeStudio/TesisANIA/Ania"
     }
   }
 }
