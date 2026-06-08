@@ -6,8 +6,12 @@
 			"args": [
 				"run",
 				"python",
-				"ServidorMCP/router/main.py"
+				"ServidorMCP/transport/main.py"
 			]
+		},
+		"my-mcp-example": {
+			"url": "http://127.0.0.1:8000/sse",
+			"type": "http"
 		}
 	},
 	"inputs": []
