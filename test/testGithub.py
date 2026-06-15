@@ -3,8 +3,8 @@ Test Sprint 1 — Conector GitHub
 Prueba: get_commits y get_pull_requests con distintos parámetros.
 """
 import asyncio
-from ServerMCP.connectors.github import GitHubConnector
-from ServerMCP.config import GITHUB_TOKEN
+from ServidorMCP.connectors.github import GitHubConnector
+from ServidorMCP.config import GITHUB_TOKEN
 
 OWNER = "anthropics"
 REPO = "anthropic-sdk-python"

@@ -3,12 +3,12 @@ Test Sprint 3 — Correlación semántica commits + docs + OpenAI
 Prueba: get_commit, build_explain_prompt y explain_commit completo.
 """
 import asyncio
-from ServerMCP.config import GITHUB_TOKEN
-from ServerMCP.connectors.github import GitHubConnector
-from ServerMCP.connectors.openai import OpenAIConnector
-from ServerMCP.connectors.markdown import read_markdown
-from ServerMCP.indexer import fragment_markdown, DocumentIndex
-from ServerMCP.prompt_builder import build_explain_prompt, SYSTEM_PROMPT
+from ServidorMCP.config import GITHUB_TOKEN
+from ServidorMCP.connectors.github import GitHubConnector
+from ServidorMCP.connectors.openai import OpenAIConnector
+from ServidorMCP.connectors.markdown import read_markdown
+from ServidorMCP.indexer import fragment_markdown, DocumentIndex
+from ServidorMCP.prompt_builder import build_explain_prompt, SYSTEM_PROMPT
 
 OWNER = "anthropics"
 REPO = "anthropic-sdk-python"

@@ -18,7 +18,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 import trafilatura
 
-from ServerMCP.config import (
+from ServidorMCP.config import (
     SCRAPE_CONCURRENCY,
     SCRAPE_DELAY,
     SCRAPE_MAX_PAGES,

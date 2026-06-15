@@ -1,4 +1,4 @@
-from ServerMCP.server import mcp
+from ServidorMCP.server import mcp
 
 
 def main():

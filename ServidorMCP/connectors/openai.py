@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 
-from ServerMCP.config import OPENAI_API_KEY, OPENAI_MODEL
+from ServidorMCP.config import OPENAI_API_KEY, OPENAI_MODEL
 
 
 class OpenAIConnector:

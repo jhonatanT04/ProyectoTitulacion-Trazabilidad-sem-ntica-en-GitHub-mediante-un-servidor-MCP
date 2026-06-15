@@ -1,8 +1,8 @@
 import json
 
-from ServerMCP.app import mcp
-from ServerMCP.connectors.scraper import scrape_library
-from ServerMCP.indexer import (
+from ServidorMCP.app import mcp
+from ServidorMCP.connectors.scraper import scrape_library
+from ServidorMCP.indexer import (
     DocumentIndex,
     fragment_markdown,
     list_indexes,

@@ -3,8 +3,8 @@ Test Sprint 2 — Módulo de Documentación Markdown
 Prueba: lectura, fragmentación semántica, indexación y búsqueda.
 """
 import asyncio
-from ServerMCP.connectors.markdown import read_markdown
-from ServerMCP.indexer import fragment_markdown, DocumentIndex
+from ServidorMCP.connectors.markdown import read_markdown
+from ServidorMCP.indexer import fragment_markdown, DocumentIndex
 
 # Documentación real de la SDK de Anthropic en GitHub (raw Markdown)
 SOURCE_URL = "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/main/README.md"

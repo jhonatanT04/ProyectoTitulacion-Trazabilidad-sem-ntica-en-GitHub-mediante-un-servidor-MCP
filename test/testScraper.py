@@ -9,14 +9,14 @@ import shutil
 from pathlib import Path
 
 # --- Aislar la persistencia en una carpeta de prueba ANTES de usar el store ---
-import ServerMCP.indexer.store as store
+import ServidorMCP.indexer.store as store
 
 TEST_INDEX_DIR = "test/.docs_index_test"
 store.INDEX_DIR = TEST_INDEX_DIR
 
 import httpx
 
-from ServerMCP.connectors.scraper import (
+from ServidorMCP.connectors.scraper import (
     HEADERS,
     _discover_from_sitemap,
     _extract_markdown,
@@ -24,7 +24,7 @@ from ServerMCP.connectors.scraper import (
     _same_scope,
     scrape_library,
 )
-from ServerMCP.tools.docs import index_docs, list_indexed_docs, search_docs
+from ServidorMCP.tools.docs import index_docs, list_indexed_docs, search_docs
 
 # Fuentes de prueba
 MD_DIRECT = "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/main/README.md"

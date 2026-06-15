@@ -1,6 +1,6 @@
-from ServerMCP.indexer.fragment import Fragment, fragment_markdown
-from ServerMCP.indexer.index import DocumentIndex
-from ServerMCP.indexer.store import (
+from ServidorMCP.indexer.fragment import Fragment, fragment_markdown
+from ServidorMCP.indexer.index import DocumentIndex
+from ServidorMCP.indexer.store import (
     list_indexes,
     load_index,
     load_meta,

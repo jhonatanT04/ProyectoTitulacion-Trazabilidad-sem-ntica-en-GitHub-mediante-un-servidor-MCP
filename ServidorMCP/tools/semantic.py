@@ -1,11 +1,11 @@
 import json
 
-from ServerMCP.app import mcp
-from ServerMCP.config import GITHUB_TOKEN
-from ServerMCP.connectors.github import GitHubConnector
-from ServerMCP.connectors.openai import OpenAIConnector
-from ServerMCP.indexer import load_index
-from ServerMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
+from ServidorMCP.app import mcp
+from ServidorMCP.config import GITHUB_TOKEN
+from ServidorMCP.connectors.github import GitHubConnector
+from ServidorMCP.connectors.openai import OpenAIConnector
+from ServidorMCP.indexer import load_index
+from ServidorMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
 
 
 def _github() -> GitHubConnector:

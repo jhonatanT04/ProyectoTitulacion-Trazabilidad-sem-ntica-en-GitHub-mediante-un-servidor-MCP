@@ -1,8 +1,8 @@
 import json
 
-from ServerMCP.app import mcp
-from ServerMCP.config import GITHUB_TOKEN
-from ServerMCP.connectors.github import GitHubConnector
+from ServidorMCP.app import mcp
+from ServidorMCP.config import GITHUB_TOKEN
+from ServidorMCP.connectors.github import GitHubConnector
 
 
 def _github() -> GitHubConnector:

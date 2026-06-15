@@ -11,8 +11,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ServerMCP.config import INDEX_DIR
-from ServerMCP.indexer.index import DocumentIndex
+from ServidorMCP.config import INDEX_DIR
+from ServidorMCP.indexer.index import DocumentIndex
 
 
 def _slug(library: str) -> str:
