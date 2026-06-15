@@ -3,9 +3,8 @@ import json
 from ServerMCP.app import mcp
 from ServerMCP.config import GITHUB_TOKEN
 from ServerMCP.connectors.github import GitHubConnector
-from ServerMCP.connectors.markdown import read_markdown
 from ServerMCP.connectors.openai import OpenAIConnector
-from ServerMCP.indexer import DocumentIndex, fragment_markdown
+from ServerMCP.indexer import load_index
 from ServerMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
 
 
@@ -18,7 +17,7 @@ async def explain_commit(
     owner: str,
     repo: str,
     sha: str,
-    doc_source: str,
+    library_url: str,
     top_k: int = 3,
 ) -> str:
     """
@@ -29,27 +28,30 @@ async def explain_commit(
         owner: Propietario del repositorio de GitHub.
         repo: Nombre del repositorio.
         sha: SHA del commit a explicar (completo o los primeros 7 caracteres).
-        doc_source: URL o ruta local a documentación Markdown relevante.
+        library_url: Librería ya indexada con `index_docs` (misma URL/fuente).
         top_k: Número de fragmentos de documentación a incluir en el contexto (default: 3).
     """
-    # 1. Obtener detalles del commit (mensaje + diffs)
+    # 1. Cargar el índice de documentación persistido
+    index = load_index(library_url)
+    if index is None:
+        import json as _json
+        return _json.dumps(
+            {"error": f"'{library_url}' no está indexada. Ejecuta primero index_docs."},
+            ensure_ascii=False,
+        )
+
+    # 2. Obtener detalles del commit (mensaje + diffs)
     gh = _github()
     commit = await gh.get_commit(owner, repo, sha)
 
-    # 2. Buscar fragmentos de documentación relevantes al mensaje del commit
-    doc_content = await read_markdown(doc_source)
-    fragments = fragment_markdown(doc_content, doc_source)
-    index = DocumentIndex()
-    index.add(fragments)
-
-    # Usar el mensaje del commit como query de búsqueda
+    # 3. Buscar fragmentos de documentación relevantes al mensaje del commit
     query = commit["message"].splitlines()[0]
     doc_fragments = index.search(query, top_k=top_k)
 
-    # 3. Construir prompt dinámico
+    # 4. Construir prompt dinámico
     prompt = build_explain_prompt(commit, doc_fragments)
 
-    # 4. Llamar a OpenAI para generar la explicación
+    # 5. Llamar a OpenAI para generar la explicación
     openai = OpenAIConnector()
     explanation = await openai.complete(system=SYSTEM_PROMPT, user=prompt)
 

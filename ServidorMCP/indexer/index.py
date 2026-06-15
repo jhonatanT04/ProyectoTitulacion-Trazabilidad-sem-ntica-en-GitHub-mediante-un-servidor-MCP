@@ -1,3 +1,6 @@
+import pickle
+from pathlib import Path
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -54,3 +57,28 @@ class DocumentIndex:
     def clear(self) -> None:
         self._fragments = []
         self._matrix = None
+
+    def save(self, path: str | Path) -> None:
+        """Persiste el índice (fragmentos + vectorizador + matriz) en disco."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("wb") as fh:
+            pickle.dump(
+                {
+                    "fragments": self._fragments,
+                    "vectorizer": self._vectorizer,
+                    "matrix": self._matrix,
+                },
+                fh,
+            )
+
+    @classmethod
+    def load(cls, path: str | Path) -> "DocumentIndex":
+        """Reconstruye un índice persistido previamente con `save`."""
+        with Path(path).open("rb") as fh:
+            data = pickle.load(fh)
+        index = cls()
+        index._fragments = data["fragments"]
+        index._vectorizer = data["vectorizer"]
+        index._matrix = data["matrix"]
+        return index

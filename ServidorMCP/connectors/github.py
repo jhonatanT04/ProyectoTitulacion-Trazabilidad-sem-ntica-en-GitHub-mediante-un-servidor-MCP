@@ -30,7 +30,7 @@ class GitHubConnector:
         if until:
             params["until"] = until
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(
                 f"{GITHUB_API_BASE}/repos/{owner}/{repo}/commits",
                 headers=self.headers,
@@ -54,7 +54,7 @@ class GitHubConnector:
 
     async def get_commit(self, owner: str, repo: str, sha: str) -> dict:
         """Extrae el detalle de un commit específico incluyendo los diffs por archivo."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(
                 f"{GITHUB_API_BASE}/repos/{owner}/{repo}/commits/{sha}",
                 headers=self.headers,
@@ -97,7 +97,7 @@ class GitHubConnector:
             "direction": "desc",
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(
                 f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls",
                 headers=self.headers,
