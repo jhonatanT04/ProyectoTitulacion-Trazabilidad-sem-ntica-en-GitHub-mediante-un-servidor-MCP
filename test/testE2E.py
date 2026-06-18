@@ -15,8 +15,9 @@ import json
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-OWNER = "anthropics"
-REPO  = "anthropic-sdk-python"
+# `REPO` acepta tanto un slug de GitHub 'owner/repo' como una ruta local a un
+# clon git (ej: "/home/user/proyecto"). El servidor autodetecta la fuente.
+REPO  = "anthropics/anthropic-sdk-python"
 SHA   = "49c5395"
 DOC   = "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/main/CONTRIBUTING.md"
 
@@ -39,6 +40,22 @@ def resultado(r) -> str:
 async def run_tests(session: ClientSession):
     passed = 0
     failed = 0
+
+    # ─────────────────────────────────────────────
+    # SETUP — Indexar la documentación una sola vez.
+    # search_docs y explain_commit requieren un índice previo
+    # construido con index_docs (misma URL/fuente).
+    # ─────────────────────────────────────────────
+    separador("SETUP — index_docs: indexando documentación")
+    r = await session.call_tool("index_docs", {
+        "library_url": DOC,
+        "max_pages": 5,
+    })
+    meta = json.loads(resultado(r))
+    if "error" in meta:
+        print(f"\n  ADVERTENCIA — no se pudo indexar {DOC}: {meta['error']}")
+    else:
+        print(f"  Indexado: {meta.get('fragments', '?')} fragmentos desde {DOC}")
 
     # ─────────────────────────────────────────────
     # OE3 — Interfaz MCP: inicialización y tools
@@ -65,7 +82,6 @@ async def run_tests(session: ClientSession):
     separador("OE1a — Conector GitHub: get_commits")
     try:
         r = await session.call_tool("get_commits", {
-            "owner": OWNER,
             "repo": REPO,
             "branch": "main",
             "limit": 5,
@@ -92,7 +108,6 @@ async def run_tests(session: ClientSession):
     separador("OE1b — Conector GitHub: get_pull_requests")
     try:
         r = await session.call_tool("get_pull_requests", {
-            "owner": OWNER,
             "repo": REPO,
             "state": "closed",
             "limit": 5,
@@ -120,7 +135,7 @@ async def run_tests(session: ClientSession):
     separador("OE2 — Documentación Markdown: search_docs")
     try:
         r = await session.call_tool("search_docs", {
-            "source": DOC,
+            "library_url": DOC,
             "query": "api key authentication header",
             "top_k": 3,
         })
@@ -149,10 +164,9 @@ async def run_tests(session: ClientSession):
     separador("OE4 — Integración semántica: explain_commit")
     try:
         r = await session.call_tool("explain_commit", {
-            "owner": OWNER,
             "repo": REPO,
             "sha": SHA,
-            "doc_source": DOC,
+            "library_url": DOC,
             "top_k": 3,
         })
         result = json.loads(resultado(r))
@@ -179,7 +193,7 @@ async def run_tests(session: ClientSession):
 
 async def main():
     print("\nINICIANDO TEST E2E — Sprint 4: Integración MCP con IDE")
-    print(f"Repositorio: {OWNER}/{REPO}")
+    print(f"Repositorio: {REPO}")
     print(f"Protocolo: JSON-RPC 2.0 sobre stdio")
 
     server_params = StdioServerParameters(

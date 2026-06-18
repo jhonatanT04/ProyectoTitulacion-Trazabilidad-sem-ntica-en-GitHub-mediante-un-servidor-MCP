@@ -1,34 +1,31 @@
 import json
 
+from mcp.server.fastmcp import Context
+
 from ServidorMCP.app import mcp
-from ServidorMCP.config import GITHUB_TOKEN
-from ServidorMCP.connectors.github import GitHubConnector
 from ServidorMCP.connectors.openai import OpenAIConnector
+from ServidorMCP.connectors.repo import resolve_repo_auto
 from ServidorMCP.indexer import load_index
 from ServidorMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
 
 
-def _github() -> GitHubConnector:
-    return GitHubConnector(GITHUB_TOKEN)
-
-
 @mcp.tool()
 async def explain_commit(
-    owner: str,
-    repo: str,
     sha: str,
     library_url: str,
+    repo: str = "",
     top_k: int = 3,
+    ctx: Context = None,
 ) -> str:
     """
     Explica un commit específico cruzando sus cambios con la documentación técnica.
     Usa OpenAI para generar una explicación en lenguaje natural.
 
     Args:
-        owner: Propietario del repositorio de GitHub.
-        repo: Nombre del repositorio.
         sha: SHA del commit a explicar (completo o los primeros 7 caracteres).
         library_url: Librería ya indexada con `index_docs` (misma URL/fuente).
+        repo: Opcional. Ruta local a un clon git o slug 'owner/repo' de GitHub.
+            Si se deja vacío, se usa el repositorio abierto en el IDE.
         top_k: Número de fragmentos de documentación a incluir en el contexto (default: 3).
     """
     # 1. Cargar el índice de documentación persistido
@@ -41,8 +38,8 @@ async def explain_commit(
         )
 
     # 2. Obtener detalles del commit (mensaje + diffs)
-    gh = _github()
-    commit = await gh.get_commit(owner, repo, sha)
+    source = await resolve_repo_auto(repo, ctx)
+    commit = await source.get_commit(sha)
 
     # 3. Buscar fragmentos de documentación relevantes al mensaje del commit
     query = commit["message"].splitlines()[0]
