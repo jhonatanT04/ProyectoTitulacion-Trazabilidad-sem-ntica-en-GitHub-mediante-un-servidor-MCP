@@ -1,17 +1,13 @@
 {
 	"servers": {
-		"MCP-GitHub-V1.0": {
+		"tesis-mcp": {
 			"type": "stdio",
 			"command": "uv",
 			"args": [
 				"run",
-				"python",
-				"ServidorMCP/transport/main.py"
-			]
-		},
-		"my-mcp-example": {
-			"url": "http://127.0.0.1:8000/sse",
-			"type": "http"
+				"tesis-mcp"
+			],
+			"cwd": "/home/jhonatan/VisualCodeStudio/TesisANIA/Ania"
 		}
 	},
 	"inputs": []
