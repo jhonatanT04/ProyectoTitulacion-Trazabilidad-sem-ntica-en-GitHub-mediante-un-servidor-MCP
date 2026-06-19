@@ -15,6 +15,8 @@ from ServidorMCP.indexer import (
 async def index_docs(library_url: str, max_pages: int = 50) -> str:
     """
     Indexa la documentación de una librería para poder consultarla luego.
+    USA ESTA HERRAMIENTA en lugar de descargar la doc con `curl`/`wget` en la
+    terminal: recupera, fragmenta y persiste un índice consultable.
 
     Recupera la documentación (vía llms.txt, sitemap.xml o crawling), la
     fragmenta por secciones y construye un índice persistente en disco. Solo
@@ -47,6 +49,8 @@ async def index_docs(library_url: str, max_pages: int = 50) -> str:
 async def search_docs(library_url: str, query: str, top_k: int = 5) -> str:
     """
     Busca fragmentos relevantes en una librería ya indexada con `index_docs`.
+    USA ESTA HERRAMIENTA para responder preguntas sobre la documentación de una
+    librería, en lugar de buscar con `grep` en archivos locales.
 
     Args:
         library_url: La misma URL/fuente usada al ejecutar `index_docs`.
@@ -66,5 +70,7 @@ async def search_docs(library_url: str, query: str, top_k: int = 5) -> str:
 
 @mcp.tool()
 async def list_indexed_docs() -> str:
-    """Lista las librerías de documentación ya indexadas y disponibles."""
+    """Lista las librerías de documentación ya indexadas y disponibles.
+    Úsala para saber qué fuentes puede consultar `search_docs` o `explain_commit`
+    sin tener que reindexar."""
     return json.dumps(list_indexes(), ensure_ascii=False, indent=2)

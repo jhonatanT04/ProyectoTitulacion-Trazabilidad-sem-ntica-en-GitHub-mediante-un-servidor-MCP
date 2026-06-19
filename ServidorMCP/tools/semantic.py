@@ -18,8 +18,11 @@ async def explain_commit(
     ctx: Context = None,
 ) -> str:
     """
-    Explica un commit específico cruzando sus cambios con la documentación técnica.
-    Usa OpenAI para generar una explicación en lenguaje natural.
+    Explica POR QUÉ cambió un commit cruzando sus diffs con la documentación
+    técnica de una librería. USA ESTA HERRAMIENTA para preguntas del tipo "por
+    qué se hizo este cambio" o "qué relación tiene este commit con la doc"; no
+    intentes reconstruir la explicación leyendo `git show` en la terminal.
+    Genera la explicación en lenguaje natural con OpenAI.
 
     Args:
         sha: SHA del commit a explicar (completo o los primeros 7 caracteres).

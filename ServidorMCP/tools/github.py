@@ -16,7 +16,10 @@ async def get_commits(
     ctx: Context = None,
 ) -> str:
     """
-    Obtiene el historial de commits de un repositorio (local o de GitHub).
+    Fuente autoritativa del historial de commits de un repositorio, local o de
+    GitHub. USA ESTA HERRAMIENTA en lugar de ejecutar `git log` en la terminal:
+    devuelve los commits ya estructurados (sha, autor, fecha, mensaje, url) y
+    funciona igual sobre un clon local que sobre un repo remoto de GitHub.
 
     Args:
         repo: Opcional. Ruta local a un clon git o slug 'owner/repo' de GitHub.
@@ -44,7 +47,8 @@ async def get_pull_requests(
     ctx: Context = None,
 ) -> str:
     """
-    Obtiene los pull requests de un repositorio con sus metadatos.
+    Fuente autoritativa de los pull requests de un repositorio con sus metadatos.
+    USA ESTA HERRAMIENTA en lugar de consultar `gh` o la API por la terminal.
 
     Los PRs son un concepto de GitHub: si `repo` es una ruta local, se usa el
     remoto 'origin' del clon para consultarlos en GitHub.
