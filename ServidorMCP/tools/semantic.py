@@ -7,6 +7,7 @@ from ServidorMCP.connectors.openai import OpenAIConnector
 from ServidorMCP.connectors.repo import resolve_repo_auto
 from ServidorMCP.indexer import load_index
 from ServidorMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
+from ServidorMCP.retrieval import retrieve
 
 
 @mcp.tool()
@@ -46,7 +47,7 @@ async def explain_commit(
 
     # 3. Buscar fragmentos de documentación relevantes al mensaje del commit
     query = commit["message"].splitlines()[0]
-    doc_fragments = index.search(query, top_k=top_k)
+    doc_fragments = await retrieve(index, query, top_k=top_k)
 
     # 4. Construir prompt dinámico
     prompt = build_explain_prompt(commit, doc_fragments)

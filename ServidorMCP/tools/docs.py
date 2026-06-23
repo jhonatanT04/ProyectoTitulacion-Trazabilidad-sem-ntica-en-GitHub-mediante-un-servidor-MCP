@@ -9,6 +9,7 @@ from ServidorMCP.indexer import (
     load_index,
     save_index,
 )
+from ServidorMCP.retrieval import embed_index, retrieve
 
 
 @mcp.tool()
@@ -18,13 +19,16 @@ async def index_docs(library_url: str, max_pages: int = 50) -> str:
     USA ESTA HERRAMIENTA en lugar de descargar la doc con `curl`/`wget` en la
     terminal: recupera, fragmenta y persiste un índice consultable.
 
-    Recupera la documentación (vía llms.txt, sitemap.xml o crawling), la
-    fragmenta por secciones y construye un índice persistente en disco. Solo
-    hay que ejecutarlo una vez por librería; después usa `search_docs`.
+    Recupera la documentación (de una URL vía llms.txt, sitemap.xml o crawling,
+    o de una ruta local en disco), la fragmenta por secciones y construye un
+    índice persistente. Solo hay que ejecutarlo una vez por fuente; después usa
+    `search_docs`.
 
     Args:
-        library_url: URL base del sitio de docs, archivo .md/.txt o raw de GitHub.
-        max_pages: Tope de páginas a descargar (default: 50).
+        library_url: URL del sitio de docs, archivo .md/.txt o raw de GitHub, o
+            una ruta local: un archivo .md/.txt o una carpeta con documentación
+            (ej. la carpeta `docs/` de un repo clonado).
+        max_pages: Tope de páginas/archivos a indexar (default: 50).
     """
     pages = await scrape_library(library_url, max_pages=max_pages)
     if not pages:
@@ -36,6 +40,9 @@ async def index_docs(library_url: str, max_pages: int = 50) -> str:
     index = DocumentIndex()
     for page in pages:
         index.add(fragment_markdown(page["markdown"], page["url"]))
+
+    # Recuperación semántica si hay OpenAI; si no, queda el baseline TF-IDF.
+    await embed_index(index)
 
     meta = save_index(library_url, index, pages=len(pages))
     return json.dumps(
@@ -64,7 +71,7 @@ async def search_docs(library_url: str, query: str, top_k: int = 5) -> str:
             ensure_ascii=False,
         )
 
-    results = index.search(query, top_k=top_k)
+    results = await retrieve(index, query, top_k=top_k)
     return json.dumps(results, ensure_ascii=False, indent=2)
 
 

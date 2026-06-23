@@ -6,6 +6,9 @@ load_dotenv()
 GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+# Modelo de embeddings para recuperación semántica de documentación.
+# Si no hay OPENAI_API_KEY o la llamada falla, el índice cae a TF-IDF.
+EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # --- Indexación y scraping de documentación ---
 # Carpeta donde se persisten los índices de documentación ya scrapeados.

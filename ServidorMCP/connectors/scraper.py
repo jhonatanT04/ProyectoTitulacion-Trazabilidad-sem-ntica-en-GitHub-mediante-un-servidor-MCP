@@ -2,6 +2,7 @@
 Conector de scraping de documentación de librerías.
 
 Estrategia de recuperación (de más fácil a más costosa):
+  0. Fuente local: archivo .md/.txt o carpeta del disco (sin red).
   1. Fuente Markdown directa (.md/.txt o raw.githubusercontent.com / llms.txt).
   2. `llms-full.txt` / `llms.txt` en la raíz del sitio (Markdown ya listo para LLMs).
   3. `sitemap.xml` para descubrir todas las páginas sin crawlear enlaces.
@@ -12,6 +13,7 @@ convierte a Markdown, de modo que reutiliza `fragment_markdown` aguas abajo.
 """
 import asyncio
 import re
+from pathlib import Path
 from urllib.parse import urljoin, urldefrag, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -26,6 +28,47 @@ from ServidorMCP.config import (
 )
 
 HEADERS = {"User-Agent": SCRAPER_USER_AGENT}
+_TEXT_EXTS = (".md", ".markdown", ".txt")
+
+
+# --------------------------------------------------------------------------- #
+# Fuente local (disco)
+# --------------------------------------------------------------------------- #
+def _is_local_path(source: str) -> bool:
+    """True si la fuente es una ruta de disco existente (no una URL http/https)."""
+    if re.match(r"^[a-z][a-z0-9+.-]*://", source.strip(), re.IGNORECASE):
+        return False
+    try:
+        return Path(source).expanduser().exists()
+    except OSError:
+        return False
+
+
+def _read_local(source: str, max_pages: int) -> list[dict]:
+    """
+    Lee documentación Markdown/texto desde el disco.
+
+    - Si `source` es un archivo, lo devuelve como una única página.
+    - Si es una carpeta, recorre recursivamente sus .md/.markdown/.txt.
+    """
+    path = Path(source).expanduser()
+
+    if path.is_file():
+        files = [path]
+    else:
+        files = sorted(
+            {f for ext in _TEXT_EXTS for f in path.rglob(f"*{ext}")}
+        )[:max_pages]
+
+    pages: list[dict] = []
+    for f in files:
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if text.strip():
+            pages.append({"url": str(f), "markdown": text})
+    return pages
 
 
 # --------------------------------------------------------------------------- #
@@ -184,13 +227,18 @@ async def scrape_library(source: str, max_pages: int | None = None) -> list[dict
     Recupera la documentación de una librería y la devuelve como páginas Markdown.
 
     Args:
-        source: URL base del sitio de docs, archivo .md/.txt o raw de GitHub.
+        source: URL del sitio de docs, archivo .md/.txt o raw de GitHub, o una
+            ruta local (archivo o carpeta) con documentación Markdown.
         max_pages: Tope de páginas (default: SCRAPE_MAX_PAGES de config).
 
     Returns:
         Lista de {"url": str, "markdown": str}.
     """
     max_pages = max_pages or SCRAPE_MAX_PAGES
+
+    # 0. Fuente local: archivo o carpeta del disco (sin red).
+    if _is_local_path(source):
+        return _read_local(source, max_pages)
 
     async with httpx.AsyncClient(
         headers=HEADERS, follow_redirects=True, timeout=30

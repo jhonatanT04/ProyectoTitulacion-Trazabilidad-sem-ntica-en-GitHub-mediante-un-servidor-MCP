@@ -40,6 +40,7 @@ def save_index(library: str, index: DocumentIndex, pages: int) -> dict:
         "indexed_at": datetime.now(timezone.utc).isoformat(),
         "pages": pages,
         "fragments": index.size,
+        "mode": index.mode,
     }
     _meta_path(library).write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
