@@ -6,8 +6,7 @@ from ServidorMCP.app import mcp
 from ServidorMCP.connectors.openai import OpenAIConnector
 from ServidorMCP.connectors.repo import resolve_repo_auto
 from ServidorMCP.indexer import load_index
-from ServidorMCP.prompt_builder import SYSTEM_PROMPT, build_explain_prompt
-from ServidorMCP.retrieval import retrieve
+from ServidorMCP.core import SYSTEM_PROMPT, build_explain_prompt, retrieve
 
 
 @mcp.tool()

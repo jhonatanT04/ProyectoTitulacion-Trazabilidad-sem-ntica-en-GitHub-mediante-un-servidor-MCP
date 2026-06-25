@@ -8,7 +8,7 @@ from ServidorMCP.connectors.github import GitHubConnector
 from ServidorMCP.connectors.openai import OpenAIConnector
 from ServidorMCP.connectors.markdown import read_markdown
 from ServidorMCP.indexer import fragment_markdown, DocumentIndex
-from ServidorMCP.prompt_builder import build_explain_prompt, SYSTEM_PROMPT
+from ServidorMCP.core import build_explain_prompt, SYSTEM_PROMPT
 
 OWNER = "anthropics"
 REPO = "anthropic-sdk-python"

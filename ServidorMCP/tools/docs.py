@@ -9,7 +9,7 @@ from ServidorMCP.indexer import (
     load_index,
     save_index,
 )
-from ServidorMCP.retrieval import embed_index, retrieve
+from ServidorMCP.core import embed_index, retrieve
 
 
 @mcp.tool()
